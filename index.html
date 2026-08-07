@@ -55,13 +55,15 @@
     color:#06121a;border:none;
   }
   button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);}
+  button.small{padding:10px 12px;font-size:13px;flex:none;}
   button:disabled{opacity:.4;cursor:not-allowed;}
-  #fileInput{display:none;}
+  #fileInput,#folderInput{display:none;}
   .drop{
     border:1.5px dashed var(--line);border-radius:14px;padding:26px 16px;
     text-align:center;color:var(--dim);cursor:pointer;font-size:14px;
   }
   .drop b{color:var(--text);}
+  .pickRow{display:flex;gap:10px;margin-top:12px;}
   #qrbox{
     background:#fff;border-radius:12px;padding:14px;display:flex;
     justify-content:center;margin:14px 0;
@@ -71,23 +73,19 @@
     display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);
     margin:6px 0 14px;
   }
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex-shrink:0;}
   .dot.live{background:var(--accent);box-shadow:0 0 8px var(--accent);}
   .dot.err{background:var(--danger);}
-  .bar{
-    height:8px;background:#1c2330;border-radius:99px;overflow:hidden;margin-top:4px;
-  }
-  .bar > div{
-    height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));
-    transition:width .15s ease;
-  }
+  .bar{height:8px;background:#1c2330;border-radius:99px;overflow:hidden;margin-top:4px;}
+  .bar>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .15s ease;}
   .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:8px;}
   .fname{font-weight:700;font-size:15px;margin-bottom:2px;word-break:break-all;}
+  .flist{font-size:12px;color:var(--dim);max-height:90px;overflow-y:auto;margin:6px 0;padding-left:2px;}
   .speed{color:var(--accent);font-weight:700;}
   a.dl{
-    display:block;text-align:center;margin-top:14px;padding:14px;border-radius:12px;
+    display:block;text-align:center;margin-top:10px;padding:12px;border-radius:12px;
     background:linear-gradient(90deg,var(--accent),var(--accent2));color:#06121a;
-    font-weight:700;text-decoration:none;
+    font-weight:700;text-decoration:none;font-size:13px;
   }
   .hidden{display:none !important;}
   .backlink{color:var(--dim);font-size:13px;text-decoration:none;display:inline-block;margin-bottom:10px;}
@@ -103,24 +101,35 @@
   .devStat b{color:var(--accent);font-weight:700;}
   .devBar{height:6px;background:#1c2330;border-radius:99px;overflow:hidden;}
   .devBar>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .15s ease;}
-  .summaryBar{
-    display:flex;justify-content:space-between;font-size:12px;color:var(--dim);
-    margin:2px 0 12px;
-  }
+  .summaryBar{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin:2px 0 12px;}
   .summaryBar b{color:var(--text);}
+  .knownRow{
+    display:flex;justify-content:space-between;align-items:center;
+    background:#171d29;border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin-bottom:10px;
+  }
+  .knownName{font-weight:700;font-size:14px;}
+  .knownSub{font-size:11px;color:var(--dim);margin-top:2px;}
+  .fileEntry{
+    display:flex;justify-content:space-between;align-items:center;
+    background:#171d29;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;margin-bottom:8px;font-size:13px;
+  }
+  .fileEntry .fpath{word-break:break-all;padding-right:8px;}
+  .fileEntry a{color:var(--accent);text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap;}
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="eyebrow">Phone A ⇄ Phone B · Direct P2P</div>
+  <div class="eyebrow">Multi-device · Direct P2P</div>
   <h1>FreeShare</h1>
 
   <!-- MODE SELECT -->
   <div id="modeSelect" class="panel">
-    <p style="margin-top:0;color:var(--dim);font-size:14px;">Ek phone se file bhejo, doosre se QR scan karke turant receive karo — seedha device-to-device, high speed.</p>
+    <p style="margin-top:0;color:var(--dim);font-size:14px;">Send files or folders from one device, scan the QR from any number of other devices to receive instantly — direct device-to-device, high speed.</p>
     <div class="row">
-      <button class="primary" id="goSend">📤 Send File<br><span style="font-weight:400;font-size:12px;">Phone A</span></button>
-      <button class="primary" id="goReceive">📷 Scan &amp; Receive<br><span style="font-weight:400;font-size:12px;">Phone B</span></button>
+      <button class="primary" id="goSend">📤 Send<br><span style="font-weight:400;font-size:12px;">This device</span></button>
+      <button class="primary" id="goReceive">📷 Scan &amp; Receive<br><span style="font-weight:400;font-size:12px;">Other device</span></button>
     </div>
   </div>
 
@@ -128,22 +137,28 @@
   <div id="senderView" class="panel hidden">
     <a href="#" class="backlink" id="backFromSend">← Back</a>
     <div id="sendStep1">
-      <div class="drop" id="dropZone"><b>Tap to choose a file</b><br>ya yahin drag-drop karo</div>
-      <input type="file" id="fileInput">
+      <div class="drop" id="dropZone"><b>Tap to choose files</b><br>or drag &amp; drop here</div>
+      <input type="file" id="fileInput" multiple>
+      <input type="file" id="folderInput" webkitdirectory directory multiple>
+      <div class="pickRow">
+        <button class="ghost small" id="pickFilesBtn">Choose Files</button>
+        <button class="ghost small" id="pickFolderBtn">Choose Folder</button>
+      </div>
     </div>
     <div id="sendStep2" class="hidden">
       <div class="fname" id="sFileName"></div>
+      <div class="flist" id="sFileList"></div>
       <div class="status"><span class="dot" id="sDot"></span><span id="sStatusText">Connecting to signaling server…</span></div>
       <div id="qrWrap" class="hidden">
         <div id="qrbox"></div>
-        <p style="text-align:center;color:var(--dim);font-size:13px;">Ye QR jitne chaho utne phones se scan karwao — sab ko file parallel me milegi</p>
+        <p style="text-align:center;color:var(--dim);font-size:13px;">Scan this QR from as many devices as you like — everyone receives the files in parallel</p>
       </div>
       <div class="summaryBar" id="summaryBar" style="display:none;">
         <span><b id="devCount">0</b> device(s) connected</span>
         <span>Total sent: <b id="totalSent">0 B</b></span>
       </div>
       <div id="deviceList"></div>
-      <button class="ghost" id="sReset" style="margin-top:6px;">Naya file bhejo</button>
+      <button class="ghost" id="sReset" style="margin-top:6px;">Send new files</button>
     </div>
   </div>
 
@@ -151,23 +166,26 @@
   <div id="receiverView" class="panel hidden">
     <a href="#" class="backlink" id="backFromRecv">← Back</a>
     <div id="recvStep1">
-      <p style="color:var(--dim);font-size:13px;margin-top:0;">Phone A par dikh rahe QR ko camera me laao.</p>
+      <div id="knownDevicesWrap" class="hidden">
+        <p style="color:var(--dim);font-size:13px;margin:0 0 8px;">Previously connected devices — reconnect instantly, no scan needed:</p>
+        <div id="knownDevices"></div>
+      </div>
+      <p style="color:var(--dim);font-size:13px;margin-top:14px;">Point your camera at the QR code shown on the sending device.</p>
       <div id="reader"></div>
     </div>
     <div id="recvStep2" class="hidden">
       <div class="status"><span class="dot" id="rDot"></span><span id="rStatusText">Connecting…</span></div>
       <div id="rFileMeta" class="hidden">
-        <div class="fname" id="rFileName"></div>
         <div class="bar"><div id="rBar"></div></div>
         <div class="meta"><span id="rPct">0%</span><span class="speed" id="rSpeed">0 KB/s</span></div>
       </div>
-      <a href="#" id="rDownload" class="dl hidden">⬇ Download File</a>
-      <button class="ghost" id="rReset" style="margin-top:14px;">Dobara scan karo</button>
+      <div id="rFileList"></div>
+      <button class="ghost" id="rReset" style="margin-top:14px;">Scan again</button>
     </div>
   </div>
 
   <p style="text-align:center;color:var(--dim);font-size:11px;margin-top:24px;">
-    Transfer direct device-to-device hota hai (WebRTC). Connect setup ke liye internet chahiye; usi WiFi par ho to speed sabse zyada milegi.
+    Transfer happens directly device-to-device (WebRTC). Internet is needed only to set up the connection — you'll get the best speed on the same WiFi.
   </p>
 </div>
 
@@ -193,64 +211,95 @@ function deviceLabel(){
   else if(/windows/i.test(ua)) base = 'Windows PC';
   else if(/macintosh|mac os/i.test(ua)) base = 'Mac';
   else if(/linux/i.test(ua)) base = 'Linux';
-  return base + '-' + Math.random().toString(16).slice(2,6);
+  let stored = localStorage.getItem('freeshare_my_label');
+  if(!stored){
+    stored = base + '-' + Math.random().toString(16).slice(2,6);
+    localStorage.setItem('freeshare_my_label', stored);
+  }
+  return stored;
 }
 
 /* ---------- MODE SWITCH ---------- */
 $('goSend').onclick = () => { $('modeSelect').classList.add('hidden'); $('senderView').classList.remove('hidden'); };
-$('goReceive').onclick = () => { $('modeSelect').classList.add('hidden'); $('receiverView').classList.remove('hidden'); startScanner(); };
+$('goReceive').onclick = () => { $('modeSelect').classList.add('hidden'); $('receiverView').classList.remove('hidden'); initReceiverEntry(); };
 $('backFromSend').onclick = (e) => { e.preventDefault(); location.reload(); };
 $('backFromRecv').onclick = (e) => { e.preventDefault(); location.reload(); };
 
 /* ================= SENDER ================= */
 let sendPeer = null;
-let selectedFile = null;
-const devices = {}; // peerId -> { row, barEl, pctEl, speedEl, bytesEl, nameEl, dotEl, bytesSent, startTime }
-let totalBytesSent = 0;
+let selectedFiles = []; // {file, relativePath}
+const devices = {};
+let totalBytesSentAll = 0;
 
+$('pickFilesBtn').onclick = () => $('fileInput').click();
+$('pickFolderBtn').onclick = () => $('folderInput').click();
 $('dropZone').onclick = () => $('fileInput').click();
-$('fileInput').onchange = (e) => { if(e.target.files[0]) beginSend(e.target.files[0]); };
+$('fileInput').onchange = (e) => { if(e.target.files.length) beginSend(Array.from(e.target.files).map(f => ({file:f, relativePath:f.name}))); };
+$('folderInput').onchange = (e) => { if(e.target.files.length) beginSend(Array.from(e.target.files).map(f => ({file:f, relativePath:f.webkitRelativePath || f.name}))); };
 $('dropZone').ondragover = (e) => { e.preventDefault(); };
-$('dropZone').ondrop = (e) => { e.preventDefault(); if(e.dataTransfer.files[0]) beginSend(e.dataTransfer.files[0]); };
+$('dropZone').ondrop = (e) => {
+  e.preventDefault();
+  if(e.dataTransfer.files.length){
+    beginSend(Array.from(e.dataTransfer.files).map(f => ({file:f, relativePath:f.webkitRelativePath || f.name})));
+  }
+};
 
-function beginSend(file){
-  selectedFile = file;
+function beginSend(files){
+  selectedFiles = files;
   $('sendStep1').classList.add('hidden');
   $('sendStep2').classList.remove('hidden');
-  $('sFileName').textContent = file.name + ' · ' + fmtBytes(file.size);
+  const totalSize = files.reduce((s,f)=>s+f.file.size,0);
+  $('sFileName').textContent = files.length + ' item(s) · ' + fmtBytes(totalSize);
+  $('sFileList').innerHTML = files.slice(0,20).map(f => '• ' + f.relativePath).join('<br>') + (files.length>20 ? '<br>…and ' + (files.length-20) + ' more' : '');
 
-  sendPeer = new Peer();
+  const savedId = localStorage.getItem('freeshare_peer_id');
+  sendPeer = savedId ? new Peer(savedId) : new Peer();
 
   sendPeer.on('open', id => {
+    localStorage.setItem('freeshare_peer_id', id);
     $('sStatusText').textContent = 'Waiting for devices to scan…';
-    $('qrWrap').classList.remove('hidden');
-    $('qrbox').innerHTML = '';
-    const shareUrl = location.origin + location.pathname + '?peer=' + encodeURIComponent(id);
-    new QRCode($('qrbox'), { text: shareUrl, width: 220, height: 220 });
-    const hint = document.createElement('p');
-    hint.style.cssText = 'text-align:center;color:var(--dim);font-size:11px;word-break:break-all;';
-    hint.textContent = shareUrl;
-    $('qrWrap').appendChild(hint);
+    renderQR(id);
   });
 
   sendPeer.on('error', err => {
+    if(err.type === 'unavailable-id'){
+      localStorage.removeItem('freeshare_peer_id');
+      sendPeer = new Peer();
+      sendPeer.on('open', id => { localStorage.setItem('freeshare_peer_id', id); $('sStatusText').textContent = 'Waiting for devices to scan…'; renderQR(id); });
+      sendPeer.on('connection', handleIncomingConn);
+      return;
+    }
     $('sDot').className = 'dot err';
     $('sStatusText').textContent = 'Error: ' + err.type;
   });
 
-  sendPeer.on('connection', conn => {
-    conn.on('data', data => {
-      if(typeof data !== 'string') return;
-      const msg = JSON.parse(data);
-      if(msg.type === 'hello'){
-        $('sDot').className = 'dot live';
-        $('sStatusText').textContent = 'Sharing live to multiple devices…';
-        addDeviceRow(conn.peer, msg.name);
-        sendFileOverConn(selectedFile, conn, conn.peer);
-      }
-    });
-    conn.on('close', () => markDeviceOffline(conn.peer));
+  sendPeer.on('connection', handleIncomingConn);
+}
+
+function renderQR(id){
+  $('qrWrap').classList.remove('hidden');
+  $('qrbox').innerHTML = '';
+  const shareUrl = location.origin + location.pathname + '?peer=' + encodeURIComponent(id);
+  new QRCode($('qrbox'), { text: shareUrl, width: 220, height: 220 });
+  const hint = document.createElement('p');
+  hint.style.cssText = 'text-align:center;color:var(--dim);font-size:11px;word-break:break-all;';
+  hint.textContent = shareUrl;
+  $('qrWrap').appendChild(hint);
+}
+
+function handleIncomingConn(conn){
+  conn.on('data', data => {
+    if(typeof data !== 'string') return;
+    const msg = JSON.parse(data);
+    if(msg.type === 'hello'){
+      $('sDot').className = 'dot live';
+      $('sStatusText').textContent = 'Sharing live to multiple devices…';
+      conn.send(JSON.stringify({ type:'sender-info', label: deviceLabel() }));
+      addDeviceRow(conn.peer, msg.name);
+      sendFilesOverConn(selectedFiles, conn, conn.peer);
+    }
   });
+  conn.on('close', () => markDeviceOffline(conn.peer));
 }
 
 function addDeviceRow(peerId, name){
@@ -288,47 +337,66 @@ function markDeviceOffline(peerId){
 }
 
 function updateTotalSent(){
-  totalBytesSent = Object.values(devices).reduce((sum,d) => sum + d.bytesSent, 0);
-  $('totalSent').textContent = fmtBytes(totalBytesSent);
+  totalBytesSentAll = Object.values(devices).reduce((sum,d) => sum + d.bytesSent, 0);
+  $('totalSent').textContent = fmtBytes(totalBytesSentAll);
 }
 
-function sendFileOverConn(file, conn, peerId){
-  conn.send(JSON.stringify({ type:'meta', name:file.name, size:file.size, mime:file.type || 'application/octet-stream' }));
+function sendFilesOverConn(files, conn, peerId){
+  const totalSize = files.reduce((s,f)=>s+f.file.size,0);
+  const manifest = files.map((f,i) => ({ id:i, name:f.file.name, relativePath:f.relativePath, size:f.file.size, mime:f.file.type||'application/octet-stream' }));
+  conn.send(JSON.stringify({ type:'manifest', files: manifest, totalSize }));
 
-  let offset = 0;
-  const reader = new FileReader();
   const d = devices[peerId];
+  let fileIndex = 0;
+  let totalOffset = 0;
 
-  function readNext(){
-    if(offset >= file.size){
-      conn.send(JSON.stringify({ type:'done' }));
+  function sendNextFile(){
+    if(fileIndex >= files.length){
+      conn.send(JSON.stringify({ type:'all-done' }));
       d.pctEl.textContent = '✅ Done';
       d.speedEl.textContent = '';
       return;
     }
-    if(conn.dataChannel && conn.dataChannel.bufferedAmount > CHUNK_SIZE * 16){
-      setTimeout(readNext, 15);
-      return;
+    const entry = files[fileIndex];
+    const file = entry.file;
+    conn.send(JSON.stringify({ type:'file-start', id:fileIndex, name:file.name, relativePath:entry.relativePath, size:file.size, mime:file.type||'application/octet-stream' }));
+    let offset = 0;
+    const reader = new FileReader();
+
+    function readNext(){
+      if(offset >= file.size){
+        conn.send(JSON.stringify({ type:'file-end', id:fileIndex }));
+        fileIndex++;
+        sendNextFile();
+        return;
+      }
+      if(conn.dataChannel && conn.dataChannel.bufferedAmount > CHUNK_SIZE * 16){
+        setTimeout(readNext, 15);
+        return;
+      }
+      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      reader.readAsArrayBuffer(slice);
     }
-    const slice = file.slice(offset, offset + CHUNK_SIZE);
-    reader.readAsArrayBuffer(slice);
+
+    reader.onload = (e) => {
+      conn.send(e.target.result);
+      offset += e.target.result.byteLength;
+      totalOffset += e.target.result.byteLength;
+      d.bytesSent = totalOffset;
+      const pct = Math.min(100, Math.round((totalOffset/totalSize)*100));
+      d.barEl.style.width = pct + '%';
+      d.pctEl.textContent = pct + '%';
+      d.bytesEl.textContent = fmtBytes(totalOffset) + ' / ' + fmtBytes(totalSize);
+      const elapsed = (Date.now() - d.startTime) / 1000;
+      if(elapsed > 0) d.speedEl.textContent = fmtSpeed(totalOffset/elapsed);
+      updateTotalSent();
+      readNext();
+    };
+
+    readNext();
   }
 
-  reader.onload = (e) => {
-    conn.send(e.target.result);
-    offset += e.target.result.byteLength;
-    d.bytesSent = offset;
-    const pct = Math.min(100, Math.round((offset/file.size)*100));
-    d.barEl.style.width = pct + '%';
-    d.pctEl.textContent = pct + '%';
-    d.bytesEl.textContent = fmtBytes(offset) + ' / ' + fmtBytes(file.size);
-    const elapsed = (Date.now() - d.startTime) / 1000;
-    if(elapsed > 0) d.speedEl.textContent = fmtSpeed(offset/elapsed);
-    updateTotalSent();
-    readNext();
-  };
-
-  readNext();
+  sendNextFile();
 }
 
 $('sReset').onclick = () => location.reload();
@@ -336,10 +404,49 @@ $('sReset').onclick = () => location.reload();
 /* ================= RECEIVER ================= */
 let scanner = null;
 let recvPeer = null;
-let incomingMeta = null;
-let receivedChunks = [];
-let receivedBytes = 0;
+let manifestInfo = null;
+let currentFileMeta = null;
+let currentChunks = [];
+let receivedBytesTotal = 0;
 let recvStartTime = 0;
+let filesDoneCount = 0;
+
+function getKnownPeers(){
+  try { return JSON.parse(localStorage.getItem('freeshare_known_peers') || '{}'); }
+  catch(e){ return {}; }
+}
+function saveKnownPeer(peerId, label){
+  const known = getKnownPeers();
+  known[peerId] = { label: label || known[peerId]?.label || 'Sender', lastConnected: Date.now() };
+  localStorage.setItem('freeshare_known_peers', JSON.stringify(known));
+}
+
+function initReceiverEntry(){
+  const known = getKnownPeers();
+  const ids = Object.keys(known);
+  if(ids.length){
+    $('knownDevicesWrap').classList.remove('hidden');
+    $('knownDevices').innerHTML = '';
+    ids.sort((a,b) => known[b].lastConnected - known[a].lastConnected).forEach(id => {
+      const row = document.createElement('div');
+      row.className = 'knownRow';
+      const when = new Date(known[id].lastConnected).toLocaleDateString();
+      row.innerHTML = `<div><div class="knownName">${known[id].label}</div><div class="knownSub">Last connected: ${when}</div></div>`;
+      const btn = document.createElement('button');
+      btn.className = 'ghost small';
+      btn.textContent = 'Reconnect';
+      btn.onclick = () => {
+        $('recvStep1').classList.add('hidden');
+        $('recvStep2').classList.remove('hidden');
+        $('rStatusText').textContent = 'Reconnecting…';
+        connectToSender(id);
+      };
+      row.appendChild(btn);
+      $('knownDevices').appendChild(row);
+    });
+  }
+  startScanner();
+}
 
 function startScanner(){
   scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: 230 }, false);
@@ -363,7 +470,10 @@ function onScanSuccess(decodedText){
   connectToSender(extractPeerId(decodedText));
 }
 
+let currentSenderPeerId = null;
+
 function connectToSender(peerId){
+  currentSenderPeerId = peerId;
   recvPeer = new Peer();
 
   recvPeer.on('open', () => {
@@ -371,55 +481,66 @@ function connectToSender(peerId){
 
     conn.on('open', () => {
       $('rDot').className = 'dot live';
-      $('rStatusText').textContent = 'Connected. Waiting for file…';
+      $('rStatusText').textContent = 'Connected. Waiting for files…';
       conn.send(JSON.stringify({ type:'hello', name: deviceLabel() }));
     });
 
-    conn.on('data', data => {
-      if(typeof data === 'string'){
-        const msg = JSON.parse(data);
-        if(msg.type === 'meta'){
-          incomingMeta = msg;
-          receivedChunks = [];
-          receivedBytes = 0;
-          recvStartTime = Date.now();
-          $('rFileMeta').classList.remove('hidden');
-          $('rFileName').textContent = msg.name + ' · ' + fmtBytes(msg.size);
-          $('rStatusText').textContent = 'Receiving…';
-        } else if(msg.type === 'done'){
-          finishReceive();
-        }
-      } else {
-        receivedChunks.push(data);
-        receivedBytes += data.byteLength;
-        const pct = Math.min(100, Math.round((receivedBytes/incomingMeta.size)*100));
-        $('rBar').style.width = pct + '%';
-        $('rPct').textContent = pct + '%';
-        const elapsed = (Date.now() - recvStartTime) / 1000;
-        if(elapsed > 0) $('rSpeed').textContent = fmtSpeed(receivedBytes/elapsed);
-      }
-    });
+    conn.on('data', data => handleReceiverData(data));
 
     conn.on('error', () => {
       $('rDot').className = 'dot err';
-      $('rStatusText').textContent = 'Connection error';
+      $('rStatusText').textContent = 'Connection error — this device may be offline. Try scanning the QR again.';
     });
   });
 
   recvPeer.on('error', err => {
     $('rDot').className = 'dot err';
-    $('rStatusText').textContent = 'Error: ' + err.type;
+    $('rStatusText').textContent = 'Error: ' + err.type + ' — try scanning the QR again.';
   });
 }
 
-function finishReceive(){
-  const blob = new Blob(receivedChunks, { type: incomingMeta.mime });
-  const url = URL.createObjectURL(blob);
-  $('rStatusText').textContent = '✅ Received!';
-  const dl = $('rDownload');
-  dl.href = url;
-  dl.download = incomingMeta.name;
-  dl.classList.remove('hidden');
+function handleReceiverData(data){
+  if(typeof data === 'string'){
+    const msg = JSON.parse(data);
+    if(msg.type === 'sender-info'){
+      saveKnownPeer(currentSenderPeerId, msg.label);
+    } else if(msg.type === 'manifest'){
+      manifestInfo = msg;
+      receivedBytesTotal = 0;
+      filesDoneCount = 0;
+      recvStartTime = Date.now();
+      $('rFileMeta').classList.remove('hidden');
+      $('rFileList').innerHTML = '';
+      $('rStatusText').textContent = 'Receiving ' + msg.files.length + ' item(s)…';
+    } else if(msg.type === 'file-start'){
+      currentFileMeta = msg;
+      currentChunks = [];
+    } else if(msg.type === 'file-end'){
+      const blob = new Blob(currentChunks, { type: currentFileMeta.mime });
+      const url = URL.createObjectURL(blob);
+      filesDoneCount++;
+      const entry = document.createElement('div');
+      entry.className = 'fileEntry';
+      entry.innerHTML = `<span class="fpath">${currentFileMeta.relativePath}</span>`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = currentFileMeta.relativePath.split('/').pop();
+      a.textContent = '⬇ Download';
+      entry.appendChild(a);
+      $('rFileList').appendChild(entry);
+      currentChunks = [];
+    } else if(msg.type === 'all-done'){
+      $('rStatusText').textContent = '✅ All files received (' + filesDoneCount + ')';
+    }
+  } else {
+    currentChunks.push(data);
+    receivedBytesTotal += data.byteLength;
+    const pct = manifestInfo ? Math.min(100, Math.round((receivedBytesTotal/manifestInfo.totalSize)*100)) : 0;
+    $('rBar').style.width = pct + '%';
+    $('rPct').textContent = pct + '%';
+    const elapsed = (Date.now() - recvStartTime) / 1000;
+    if(elapsed > 0) $('rSpeed').textContent = fmtSpeed(receivedBytesTotal/elapsed);
+  }
 }
 
 $('rReset').onclick = () => location.reload();
