@@ -117,6 +117,63 @@
   }
   .fileEntry .fpath{word-break:break-all;padding-right:8px;}
   .fileEntry a{color:var(--accent);text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap;}
+
+  /* ---- Select Files grid screen ---- */
+  #selectScreen{
+    position:fixed;inset:0;background:var(--bg);z-index:50;
+    display:flex;flex-direction:column;max-width:440px;margin:0 auto;
+  }
+  .selTopBar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px;border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  .selTopBar .iconBtn{
+    flex:none;width:36px;height:36px;padding:0;border:none;background:transparent;
+    color:var(--text);font-size:18px;border-radius:8px;
+  }
+  .selTitle{font-weight:700;font-size:16px;}
+  .selTabs{
+    display:flex;gap:4px;padding:8px 12px;overflow-x:auto;
+    border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  .tabBtn{
+    flex:none;background:transparent;border:none;color:var(--dim);
+    font-size:13px;font-weight:600;padding:8px 12px;border-radius:8px;
+    white-space:nowrap;border-bottom:2px solid transparent;
+  }
+  .tabBtn.active{color:var(--accent);border-bottom:2px solid var(--accent);}
+  .selGrid{
+    flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(4,1fr);
+    gap:10px;padding:14px;align-content:start;
+  }
+  .selItem{cursor:pointer;}
+  .selThumbWrap{
+    position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;
+    background:#171d29;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:26px;
+  }
+  .selThumbWrap img{width:100%;height:100%;object-fit:cover;display:block;}
+  .selCheck{
+    position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;
+    background:rgba(0,0,0,.45);border:1.5px solid #fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:transparent;
+  }
+  .selCheck.checked{background:var(--accent);border-color:var(--accent);color:#06121a;}
+  .selName{
+    font-size:11px;margin-top:5px;text-align:center;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  .selSize{font-size:10px;color:var(--dim);text-align:center;}
+  .selBottomBar{
+    display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);
+    background:var(--panel);flex-shrink:0;
+  }
+  .selCountPill{
+    flex:1;display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--line);border-radius:99px;color:var(--dim);
+    font-size:14px;font-weight:700;
+  }
 </style>
 </head>
 <body>
@@ -189,6 +246,27 @@
   </p>
 </div>
 
+<!-- SELECT FILES GRID (SHAREit-style picker) -->
+<div id="selectScreen" class="hidden">
+  <div class="selTopBar">
+    <button class="iconBtn" id="selBack">←</button>
+    <div class="selTitle">Select Files</div>
+    <div style="width:36px;"></div>
+  </div>
+  <div class="selTabs" id="selTabs">
+    <button class="tabBtn active" data-cat="all">All</button>
+    <button class="tabBtn" data-cat="image">Photos</button>
+    <button class="tabBtn" data-cat="video">Videos</button>
+    <button class="tabBtn" data-cat="audio">Music</button>
+    <button class="tabBtn" data-cat="other">Files</button>
+  </div>
+  <div class="selGrid" id="selGrid"></div>
+  <div class="selBottomBar">
+    <div class="selCountPill" id="selCountPill">Selected (0)</div>
+    <button class="primary" id="selSendBtn">Send</button>
+  </div>
+</div>
+
 <script>
 const CHUNK_SIZE = 65536; // 64KB
 const $ = id => document.getElementById(id);
@@ -234,14 +312,89 @@ let totalBytesSentAll = 0;
 $('pickFilesBtn').onclick = () => $('fileInput').click();
 $('pickFolderBtn').onclick = () => $('folderInput').click();
 $('dropZone').onclick = () => $('fileInput').click();
-$('fileInput').onchange = (e) => { if(e.target.files.length) beginSend(Array.from(e.target.files).map(f => ({file:f, relativePath:f.name}))); };
-$('folderInput').onchange = (e) => { if(e.target.files.length) beginSend(Array.from(e.target.files).map(f => ({file:f, relativePath:f.webkitRelativePath || f.name}))); };
+$('fileInput').onchange = (e) => { if(e.target.files.length) showSelectionScreen(Array.from(e.target.files).map(f => ({file:f, relativePath:f.name}))); };
+$('folderInput').onchange = (e) => { if(e.target.files.length) showSelectionScreen(Array.from(e.target.files).map(f => ({file:f, relativePath:f.webkitRelativePath || f.name}))); };
 $('dropZone').ondragover = (e) => { e.preventDefault(); };
 $('dropZone').ondrop = (e) => {
   e.preventDefault();
   if(e.dataTransfer.files.length){
-    beginSend(Array.from(e.dataTransfer.files).map(f => ({file:f, relativePath:f.webkitRelativePath || f.name})));
+    showSelectionScreen(Array.from(e.dataTransfer.files).map(f => ({file:f, relativePath:f.webkitRelativePath || f.name})));
   }
+};
+
+/* ---- Select Files grid (SHAREit-style picker) ---- */
+let rawPicked = [];
+let selectedIdx = new Set();
+let currentTab = 'all';
+
+function categoryOf(file){
+  const t = file.type || '';
+  if(t.startsWith('image/')) return 'image';
+  if(t.startsWith('video/')) return 'video';
+  if(t.startsWith('audio/')) return 'audio';
+  return 'other';
+}
+function iconFor(cat){
+  if(cat === 'video') return '🎬';
+  if(cat === 'audio') return '🎵';
+  return '📄';
+}
+
+function showSelectionScreen(files){
+  rawPicked = files.map(f => ({ file:f.file, relativePath:f.relativePath, category: categoryOf(f.file) }));
+  selectedIdx = new Set(rawPicked.map((_,i) => i)); // all selected by default
+  currentTab = 'all';
+  document.querySelectorAll('.tabBtn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
+  renderSelGrid();
+  updateSelCount();
+  $('selectScreen').classList.remove('hidden');
+}
+
+function renderSelGrid(){
+  const grid = $('selGrid');
+  grid.innerHTML = '';
+  rawPicked.forEach((item, i) => {
+    if(currentTab !== 'all' && item.category !== currentTab) return;
+    const div = document.createElement('div');
+    div.className = 'selItem';
+    const thumbInner = item.category === 'image'
+      ? `<img src="${URL.createObjectURL(item.file)}">`
+      : `<span>${iconFor(item.category)}</span>`;
+    div.innerHTML = `
+      <div class="selThumbWrap">
+        ${thumbInner}
+        <div class="selCheck ${selectedIdx.has(i) ? 'checked' : ''}">✓</div>
+      </div>
+      <div class="selName">${item.relativePath.split('/').pop()}</div>
+      <div class="selSize">${fmtBytes(item.file.size)}</div>`;
+    div.onclick = () => {
+      if(selectedIdx.has(i)) selectedIdx.delete(i); else selectedIdx.add(i);
+      renderSelGrid();
+      updateSelCount();
+    };
+    grid.appendChild(div);
+  });
+}
+
+function updateSelCount(){
+  $('selCountPill').textContent = 'Selected (' + selectedIdx.size + ')';
+}
+
+document.querySelectorAll('.tabBtn').forEach(btn => {
+  btn.onclick = () => {
+    currentTab = btn.dataset.cat;
+    document.querySelectorAll('.tabBtn').forEach(b => b.classList.toggle('active', b === btn));
+    renderSelGrid();
+  };
+});
+
+$('selBack').onclick = () => { $('selectScreen').classList.add('hidden'); };
+
+$('selSendBtn').onclick = () => {
+  const chosen = rawPicked.filter((_, i) => selectedIdx.has(i));
+  if(!chosen.length) return;
+  $('selectScreen').classList.add('hidden');
+  beginSend(chosen.map(c => ({ file:c.file, relativePath:c.relativePath })));
 };
 
 function beginSend(files){
