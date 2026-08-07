@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>QuickShare — Scan &amp; Send</title>
+<title>FreeShare — Scan &amp; Send</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
@@ -91,12 +91,29 @@
   }
   .hidden{display:none !important;}
   .backlink{color:var(--dim);font-size:13px;text-decoration:none;display:inline-block;margin-bottom:10px;}
+  #deviceList{margin-top:6px;}
+  .devRow{
+    background:#171d29;border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;margin-bottom:10px;
+  }
+  .devTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .devName{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
+  .devName .dot{width:7px;height:7px;}
+  .devStat{font-size:11px;color:var(--dim);}
+  .devStat b{color:var(--accent);font-weight:700;}
+  .devBar{height:6px;background:#1c2330;border-radius:99px;overflow:hidden;}
+  .devBar>div{height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .15s ease;}
+  .summaryBar{
+    display:flex;justify-content:space-between;font-size:12px;color:var(--dim);
+    margin:2px 0 12px;
+  }
+  .summaryBar b{color:var(--text);}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="eyebrow">Phone A ⇄ Phone B · Direct P2P</div>
-  <h1>QuickShare</h1>
+  <h1>FreeShare</h1>
 
   <!-- MODE SELECT -->
   <div id="modeSelect" class="panel">
@@ -119,14 +136,14 @@
       <div class="status"><span class="dot" id="sDot"></span><span id="sStatusText">Connecting to signaling server…</span></div>
       <div id="qrWrap" class="hidden">
         <div id="qrbox"></div>
-        <p style="text-align:center;color:var(--dim);font-size:13px;">Phone B par "Scan & Receive" khol kar ye QR scan karo</p>
+        <p style="text-align:center;color:var(--dim);font-size:13px;">Ye QR jitne chaho utne phones se scan karwao — sab ko file parallel me milegi</p>
       </div>
-      <div id="sProgressWrap" class="hidden">
-        <div class="bar"><div id="sBar"></div></div>
-        <div class="meta"><span id="sPct">0%</span><span class="speed" id="sSpeed">0 KB/s</span></div>
+      <div class="summaryBar" id="summaryBar" style="display:none;">
+        <span><b id="devCount">0</b> device(s) connected</span>
+        <span>Total sent: <b id="totalSent">0 B</b></span>
       </div>
-      <div id="sDone" class="hidden" style="text-align:center;color:var(--accent);font-weight:700;margin-top:10px;">✅ File Phone B tak pahunch gayi!</div>
-      <button class="ghost" id="sReset" style="margin-top:14px;">Naya file bhejo</button>
+      <div id="deviceList"></div>
+      <button class="ghost" id="sReset" style="margin-top:6px;">Naya file bhejo</button>
     </div>
   </div>
 
@@ -167,6 +184,17 @@ function fmtSpeed(bytesPerSec){
   if(bytesPerSec < 1024*1024) return (bytesPerSec/1024).toFixed(0) + ' KB/s';
   return (bytesPerSec/1024/1024).toFixed(2) + ' MB/s';
 }
+function deviceLabel(){
+  const ua = navigator.userAgent;
+  let base = 'Device';
+  if(/android/i.test(ua)) base = 'Android';
+  else if(/iphone/i.test(ua)) base = 'iPhone';
+  else if(/ipad/i.test(ua)) base = 'iPad';
+  else if(/windows/i.test(ua)) base = 'Windows PC';
+  else if(/macintosh|mac os/i.test(ua)) base = 'Mac';
+  else if(/linux/i.test(ua)) base = 'Linux';
+  return base + '-' + Math.random().toString(16).slice(2,6);
+}
 
 /* ---------- MODE SWITCH ---------- */
 $('goSend').onclick = () => { $('modeSelect').classList.add('hidden'); $('senderView').classList.remove('hidden'); };
@@ -176,6 +204,9 @@ $('backFromRecv').onclick = (e) => { e.preventDefault(); location.reload(); };
 
 /* ================= SENDER ================= */
 let sendPeer = null;
+let selectedFile = null;
+const devices = {}; // peerId -> { row, barEl, pctEl, speedEl, bytesEl, nameEl, dotEl, bytesSent, startTime }
+let totalBytesSent = 0;
 
 $('dropZone').onclick = () => $('fileInput').click();
 $('fileInput').onchange = (e) => { if(e.target.files[0]) beginSend(e.target.files[0]); };
@@ -183,6 +214,7 @@ $('dropZone').ondragover = (e) => { e.preventDefault(); };
 $('dropZone').ondrop = (e) => { e.preventDefault(); if(e.dataTransfer.files[0]) beginSend(e.dataTransfer.files[0]); };
 
 function beginSend(file){
+  selectedFile = file;
   $('sendStep1').classList.add('hidden');
   $('sendStep2').classList.remove('hidden');
   $('sFileName').textContent = file.name + ' · ' + fmtBytes(file.size);
@@ -190,7 +222,7 @@ function beginSend(file){
   sendPeer = new Peer();
 
   sendPeer.on('open', id => {
-    $('sStatusText').textContent = 'Waiting for Phone B to scan…';
+    $('sStatusText').textContent = 'Waiting for devices to scan…';
     $('qrWrap').classList.remove('hidden');
     $('qrbox').innerHTML = '';
     const shareUrl = location.origin + location.pathname + '?peer=' + encodeURIComponent(id);
@@ -207,27 +239,71 @@ function beginSend(file){
   });
 
   sendPeer.on('connection', conn => {
-    $('sDot').className = 'dot live';
-    $('sStatusText').textContent = 'Phone B connected. Sending…';
-    $('qrWrap').classList.add('hidden');
-    $('sProgressWrap').classList.remove('hidden');
-
-    conn.on('open', () => sendFileOverConn(file, conn));
+    conn.on('data', data => {
+      if(typeof data !== 'string') return;
+      const msg = JSON.parse(data);
+      if(msg.type === 'hello'){
+        $('sDot').className = 'dot live';
+        $('sStatusText').textContent = 'Sharing live to multiple devices…';
+        addDeviceRow(conn.peer, msg.name);
+        sendFileOverConn(selectedFile, conn, conn.peer);
+      }
+    });
+    conn.on('close', () => markDeviceOffline(conn.peer));
   });
 }
 
-function sendFileOverConn(file, conn){
+function addDeviceRow(peerId, name){
+  $('summaryBar').style.display = 'flex';
+  const row = document.createElement('div');
+  row.className = 'devRow';
+  row.innerHTML = `
+    <div class="devTop">
+      <div class="devName"><span class="dot live"></span>${name}</div>
+      <div class="devStat"><b class="pct">0%</b></div>
+    </div>
+    <div class="devBar"><div class="bar-fill"></div></div>
+    <div class="devStat" style="margin-top:6px;display:flex;justify-content:space-between;">
+      <span class="bytesLbl">0 B / …</span>
+      <span class="speedLbl">0 KB/s</span>
+    </div>`;
+  $('deviceList').appendChild(row);
+  devices[peerId] = {
+    row,
+    pctEl: row.querySelector('.pct'),
+    barEl: row.querySelector('.bar-fill'),
+    bytesEl: row.querySelector('.bytesLbl'),
+    speedEl: row.querySelector('.speedLbl'),
+    bytesSent: 0,
+    startTime: Date.now()
+  };
+  $('devCount').textContent = Object.keys(devices).length;
+}
+
+function markDeviceOffline(peerId){
+  const d = devices[peerId];
+  if(!d) return;
+  const dotEl = d.row.querySelector('.dot');
+  if(dotEl) dotEl.className = 'dot';
+}
+
+function updateTotalSent(){
+  totalBytesSent = Object.values(devices).reduce((sum,d) => sum + d.bytesSent, 0);
+  $('totalSent').textContent = fmtBytes(totalBytesSent);
+}
+
+function sendFileOverConn(file, conn, peerId){
   conn.send(JSON.stringify({ type:'meta', name:file.name, size:file.size, mime:file.type || 'application/octet-stream' }));
 
   let offset = 0;
   const reader = new FileReader();
-  const startTime = Date.now();
+  const d = devices[peerId];
 
   function readNext(){
     if(offset >= file.size){
       conn.send(JSON.stringify({ type:'done' }));
-      $('sProgressWrap').classList.add('hidden');
-      $('sDone').classList.remove('hidden');
+      d.pctEl.textContent = '✅ Done';
+      d.speedEl.textContent = '';
       return;
     }
     if(conn.dataChannel && conn.dataChannel.bufferedAmount > CHUNK_SIZE * 16){
@@ -241,11 +317,14 @@ function sendFileOverConn(file, conn){
   reader.onload = (e) => {
     conn.send(e.target.result);
     offset += e.target.result.byteLength;
+    d.bytesSent = offset;
     const pct = Math.min(100, Math.round((offset/file.size)*100));
-    $('sBar').style.width = pct + '%';
-    $('sPct').textContent = pct + '%';
-    const elapsed = (Date.now() - startTime) / 1000;
-    if(elapsed > 0) $('sSpeed').textContent = fmtSpeed(offset/elapsed);
+    d.barEl.style.width = pct + '%';
+    d.pctEl.textContent = pct + '%';
+    d.bytesEl.textContent = fmtBytes(offset) + ' / ' + fmtBytes(file.size);
+    const elapsed = (Date.now() - d.startTime) / 1000;
+    if(elapsed > 0) d.speedEl.textContent = fmtSpeed(offset/elapsed);
+    updateTotalSent();
     readNext();
   };
 
@@ -293,6 +372,7 @@ function connectToSender(peerId){
     conn.on('open', () => {
       $('rDot').className = 'dot live';
       $('rStatusText').textContent = 'Connected. Waiting for file…';
+      conn.send(JSON.stringify({ type:'hello', name: deviceLabel() }));
     });
 
     conn.on('data', data => {
